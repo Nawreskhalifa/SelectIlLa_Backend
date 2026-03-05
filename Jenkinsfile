@@ -10,12 +10,12 @@ pipeline {
     stages {
 
         stage('SCM') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/Nawreskhalifa/SelectIlLa_Backend.git'
-            }
-        }
-
+    steps {
+        git branch: 'main',
+            url: 'git@github.com:Nawreskhalifa/SelectIlLa_Backend.git',
+            credentialsId: 'github-ssh-key'
+    }
+}
         stage('Install npm') {
             steps {
                 sh 'npm install'
