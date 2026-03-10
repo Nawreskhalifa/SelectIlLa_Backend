@@ -26,11 +26,42 @@ pipeline {
         //        sh 'npm test'
           //  }
     //    }
-        stage('Test SonarQube') {
-            steps {
-                sh 'curl -I http://sonarqube:9000'
+        stage('Wait for SonarQube') {
+    steps {
+        script {
+            echo "Attente que SonarQube soit prêt..."
+            def maxRetries = 30
+            def retryCount = 0
+            def ready = false
+
+            while (!ready && retryCount < maxRetries) {
+                try {
+                    def status = sh(
+                        script: "curl -s http://sonarqube:9000/api/system/status",
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (status.contains("UP")) {
+                        echo "SonarQube est prêt !"
+                        ready = true
+                    } else {
+                        echo "SonarQube pas encore prêt, attente 10s..."
+                        sleep 10
+                        retryCount++
+                    }
+                } catch (Exception e) {
+                    echo "Connexion échouée, attente 10s..."
+                    sleep 10
+                    retryCount++
+                }
+            }
+
+            if (!ready) {
+                error("SonarQube n'est pas prêt après ${maxRetries * 10} secondes !")
             }
         }
+    }
+}
      
         stage('SonarQube Analysis') {
             steps {

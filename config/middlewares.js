@@ -25,7 +25,7 @@ module.exports = [
         "Access-Control-Request-Method",
         "Access-Control-Request-Headers",
       ],
-      origin: ["http://localhost:8080", "http://localhost:1337"],
+      origin: ["http://localhost:8080", "http://localhost:1337",'http://localhost:3000']
     },
   },
 ];
