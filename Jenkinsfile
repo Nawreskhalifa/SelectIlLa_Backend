@@ -75,6 +75,19 @@ pipeline {
             }
         }
     }
+    
+
+    stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    script {
+                        def qg = waitForQualityGate(abortPipeline: true)
+                        echo "Status Quality Gate: ${qg.status}"
+                    }
+                }
+            }
+        }
+    }
 
     post {
         always {
@@ -85,6 +98,12 @@ pipeline {
         }
         failure {
             echo 'Pipeline échoué !'
+            emailext(
+                subject: "Échec du pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """<p>Le pipeline a échoué.</p>
+                         <p>Vérifier Jenkins ici : <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
+                to: 'nawreskhalifa17@gmail.com'
+            )
         }
     }
 }
