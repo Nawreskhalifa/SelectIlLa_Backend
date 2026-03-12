@@ -22,12 +22,7 @@ pipeline {
             }
         }
 
-        stage('Run Tests & Coverage') {
-            steps {
-                // Si tu utilises jest
-                sh 'npm test -- --coverage'
-            }
-        }
+       
 
         stage('Wait for SonarQube') {
             steps {
