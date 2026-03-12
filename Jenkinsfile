@@ -2,21 +2,25 @@ pipeline {
     agent any
 
     environment {
+        // Credential Jenkins pour le token SonarQube
         SONAR_TOKEN = credentials('sonarqube')
+        // URL du serveur SonarQube (Docker ou localhost selon ton setup)
         SONAR_HOST_URL = 'http://sonarqube:9000'
         PATH = "/opt/sonar-scanner/bin:${env.PATH}"
     }
 
     stages {
-        stage('SCM') {
+        stage('Checkout SCM') {
             steps {
+                echo "Récupération du code source..."
                 git branch: 'main',
                     url: 'https://github.com/Nawreskhalifa/SelectIlLa_Backend.git'
             }
         }
 
-        stage('Install npm') {
+        stage('Install Dependencies') {
             steps {
+                echo "Installation des dépendances npm..."
                 sh 'npm install'
             }
         }
@@ -32,10 +36,9 @@ pipeline {
                     while (!ready && retryCount < maxRetries) {
                         try {
                             def status = sh(
-                                script: "curl -s http://sonarqube:9000/api/system/status",
+                                script: "curl -s ${SONAR_HOST_URL}/api/system/status",
                                 returnStdout: true
                             ).trim()
-                            
                             if (status.contains("UP")) {
                                 echo "SonarQube est prêt !"
                                 ready = true
@@ -58,19 +61,16 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('Run SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') { 
-                    sh '''
-                        /opt/sonar-scanner/bin/sonar-scanner \
-                            -Dsonar.projectKey=SelectIlLa_Backend \
-                            -Dsonar.sources=. \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.login=${SONAR_TOKEN}
-                    '''
+                echo "Lancement de l'analyse SonarQube..."
+                withSonarQubeEnv('sonarqube') {
+                    // Le scanner lira ton sonar-project.properties automatiquement
+                    sh 'sonar-scanner'
                 }
             }
         }
+
         stage('Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
@@ -79,6 +79,14 @@ pipeline {
                         echo "Status Quality Gate: ${qg.status}"
                     }
                 }
+            }
+        }
+
+        // Optionnel : tests unitaires si tu veux
+        stage('Run Tests') {
+            steps {
+                echo "Lancement des tests unitaires..."
+                sh 'npm test'
             }
         }
     }
