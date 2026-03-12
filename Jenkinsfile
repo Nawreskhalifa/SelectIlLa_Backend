@@ -60,15 +60,13 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') { 
-                    sh '''
-                        /opt/sonar-scanner/bin/sonar-scanner \
-                            -Dsonar.projectKey=SelectIlLa_Backend \
-                            -Dsonar.sources=. \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.login=${SONAR_TOKEN}
-                    '''
-                }
+                sh '''
+                    /opt/sonar-scanner/bin/sonar-scanner \
+                        -Dsonar.projectKey=SelectIlLa_Backend \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.login=${SONAR_TOKEN}
+                '''
             }
         }
       //  stage('Quality Gate') {
