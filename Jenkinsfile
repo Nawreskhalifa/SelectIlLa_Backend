@@ -5,6 +5,9 @@ pipeline {
         SONAR_TOKEN = credentials('sonarqube')
         SONAR_HOST_URL = 'http://sonarqube:9000'
         PATH = "/opt/sonar-scanner/bin:${env.PATH}"
+        DOCKERHUB_USERNAME = 'nawreskhalifa'                 
+        IMAGE_BACKEND      = "${DOCKERHUB_USERNAME}/selectilla-backend"
+        IMAGE_TAG          = "${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -69,33 +72,55 @@ pipeline {
                 '''
             }
         }
-      //  stage('Quality Gate') {
-       //     steps {
-         //       timeout(time: 10, unit: 'MINUTES') {
-           //         script {
-             //           def qg = waitForQualityGate(abortPipeline: true)
-               //         echo "Status Quality Gate: ${qg.status}"
-                 //   }
-               // }
-         //      }
-      //     }
-  //     }
-
-  //     post {
-      //     always {
-           //    echo 'Pipeline terminé.'
-  //         }
-       //    success {
-       //        echo 'Pipeline exécuté avec succès !'
-      //     }
-      //     failure {
-          //     echo 'Pipeline échoué !'
-         //      emailext(
-            //       subject: "Échec du pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-         //          body: """<p>Le pipeline a échoué.</p>
-          //                  <p>Vérifier Jenkins ici : <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
-         //          to: 'nawreskhalifa17@gmail.com'
-        //       )
-     //      }
+   
     }
-}
+      stage('Login DockerHub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials', 
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                }
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                echo 'Build image backend...'
+                sh """
+                    docker build -t ${IMAGE_BACKEND}:${IMAGE_TAG} .
+                    docker tag ${IMAGE_BACKEND}:${IMAGE_TAG} ${IMAGE_BACKEND}:latest
+                """
+            }
+        }
+
+        stage('Push Backend') {
+            steps {
+                echo 'Push backend sur DockerHub...'
+                sh """
+                    docker push ${IMAGE_BACKEND}:${IMAGE_TAG}
+                    docker push ${IMAGE_BACKEND}:latest
+                """
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                echo 'Nettoyage...'
+                sh "docker rmi ${IMAGE_BACKEND}:${IMAGE_TAG} || true"
+            }
+        }
+   
+    post {
+        success {
+            echo ' Pipeline terminé avec succès !'
+        }
+        failure {
+            echo 'Pipeline échoué !'
+        }
+    }
+
+    
+ }
