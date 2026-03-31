@@ -73,7 +73,7 @@ pipeline {
             }
         }
    
-    }
+    
       stage('Login DockerHub') {
             steps {
                 withCredentials([usernamePassword(
@@ -111,6 +111,7 @@ pipeline {
                 echo 'Nettoyage...'
                 sh "docker rmi ${IMAGE_BACKEND}:${IMAGE_TAG} || true"
             }
+        }
         }
    
     post {
