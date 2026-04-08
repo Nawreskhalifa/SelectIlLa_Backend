@@ -8,9 +8,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - .env.docker
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - ./SelectIlLa_Backend/.env.docker
     networks:
       - app-network
 
@@ -20,14 +18,9 @@ services:
     ports:
       - "82:80"
     env_file:
-      - /home/nawres/projetPFE/SelectIlLa_front/.env
+      - ./SelectIlLa_front/.env
     networks:
       - app-network
-  
-
-volumes:
-  selectilla_backend_data:
-
 
 networks:
   app-network:
