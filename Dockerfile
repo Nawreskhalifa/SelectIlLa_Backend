@@ -2,7 +2,7 @@
 # STAGE 1 : BUILD
 # =========================
 # Image officielle Node.js
-FROM node:16 AS builder
+FROM node:18 AS builder
 
 # Dossier de travail dans le container
 WORKDIR /app
@@ -21,7 +21,7 @@ RUN npm run build
 # =========================
 # STAGE 2 : PRODUCTION
 # =========================
-FROM node:16-alpine
+FROM node:18-alpine
 
 WORKDIR /app
 
