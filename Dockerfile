@@ -1,5 +1,8 @@
+# =========================
+# STAGE 1 : BUILD
+# =========================
 # Image officielle Node.js
-FROM node:20
+FROM node:16 AS builder
 
 # Dossier de travail dans le container
 WORKDIR /app
@@ -15,8 +18,19 @@ COPY . .
 
 # Build Strapi (si nécessaire)
 RUN npm run build
+# =========================
+# STAGE 2 : PRODUCTION
+# =========================
+FROM node:16-alpine
 
-# Exposer le port (Strapi = 1337)
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install --omit=dev
+
+COPY --from=builder /app .
+
+# Exposer le port (Strapi = )
 EXPOSE 3000
 
 # Commande pour lancer l'app

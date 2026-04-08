@@ -4,13 +4,15 @@ pipeline {
     environment {
         SONAR_TOKEN = credentials('sonarqube')
         SONAR_HOST_URL = 'http://sonarqube:9000'
+
+        AWS_REGION = 'eu-north-1'
+        ECR_REPO = '289835834707.dkr.ecr.eu-north-1.amazonaws.com/selectilla-backend'
+        IMAGE_TAG = 'latest'
         PATH = "/opt/sonar-scanner/bin:${env.PATH}"
-        DOCKERHUB_USERNAME = 'nawreskhalifa'                 
-        IMAGE_BACKEND      = "${DOCKERHUB_USERNAME}/selectilla-backend"
-        IMAGE_TAG          = "${env.BUILD_NUMBER}"
     }
 
     stages {
+
         stage('SCM') {
             steps {
                 git branch: 'main',
@@ -38,24 +40,24 @@ pipeline {
                                 script: "curl -s http://sonarqube:9000/api/system/status",
                                 returnStdout: true
                             ).trim()
-                            
+
                             if (status.contains("UP")) {
                                 echo "SonarQube est prêt !"
                                 ready = true
                             } else {
-                                echo "SonarQube pas encore prêt, attente 10s..."
+                                echo "SonarQube pas encore prêt..."
                                 sleep 10
                                 retryCount++
                             }
                         } catch (Exception e) {
-                            echo "Connexion échouée, attente 10s..."
+                            echo "Connexion échouée..."
                             sleep 10
                             retryCount++
                         }
                     }
 
                     if (!ready) {
-                        error("SonarQube n'est pas prêt après ${maxRetries * 10} secondes !")
+                        error("SonarQube n'est pas prêt !")
                     }
                 }
             }
@@ -72,56 +74,45 @@ pipeline {
                 '''
             }
         }
-   
-    
-      stage('Login DockerHub') {
+
+        stage('Build Docker Image') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials', 
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                sh 'docker build -t selectilla-backend .'
+            }
+        }
+
+        stage('Tag Image') {
+            steps {
+                sh '''
+                    docker tag selectilla-backend:latest $ECR_REPO:$IMAGE_TAG
+                '''
+            }
+        }
+
+        stage('Login to AWS ECR') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    sh '''
+                        aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                        aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                        aws configure set region $AWS_REGION
+
+                        aws ecr get-login-password --region $AWS_REGION | \
+                        docker login --username AWS --password-stdin $ECR_REPO
+                    '''
                 }
             }
         }
 
-        stage('Build Backend') {
+        stage('Push to ECR') {
             steps {
-                echo 'Build image backend...'
-                sh """
-                    docker build -t ${IMAGE_BACKEND}:${IMAGE_TAG} .
-                    docker tag ${IMAGE_BACKEND}:${IMAGE_TAG} ${IMAGE_BACKEND}:latest
-                """
+                sh '''
+                    docker push $ECR_REPO:$IMAGE_TAG
+                '''
             }
-        }
-
-        stage('Push Backend') {
-            steps {
-                echo 'Push backend sur DockerHub...'
-                sh """
-                    docker push ${IMAGE_BACKEND}:${IMAGE_TAG}
-                    docker push ${IMAGE_BACKEND}:latest
-                """
-            }
-        }
-
-        stage('Cleanup') {
-            steps {
-                echo 'Nettoyage...'
-                sh "docker rmi ${IMAGE_BACKEND}:${IMAGE_TAG} || true"
-            }
-        }
-        }
-   
-    post {
-        success {
-            echo ' Pipeline terminé avec succès !'
-        }
-        failure {
-            echo 'Pipeline échoué !'
         }
     }
-
-    
- }
+}
