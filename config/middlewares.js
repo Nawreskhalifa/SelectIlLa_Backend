@@ -9,10 +9,13 @@ module.exports = [
         directives: {
           "connect-src": [
             "'self'",
+            'http://192.168.49.2:30007',
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "https://analytics.strapi.io",
             "http://localhost:3001",
+            'http://localhost:3002',
+            'https://analytics.strapi.io',
           ],
           "img-src": ["'self'", "data:", "blob:", "http:"],
           "media-src": ["'self'", "data:", "blob:", "http:"],
@@ -46,7 +49,14 @@ module.exports = [
          "http://localhost:3001",
          "http://localhost", 
          "http://localhost:80",
-          "http://localhost:82",]
+          "http://localhost:82",
+        'http://192.168.49.2:30007',
+      'http://127.0.0.1:3000',
+    'http://localhost:3002',
+  "http://frontend-service",
+        "http://frontend-service:80",
+        'http://192.168.49.2:30080',
+      ]
     
     },
   },

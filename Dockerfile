@@ -1,27 +1,14 @@
-# =========================
-# STAGE 1 : BUILD
-# =========================
-# Image officielle Node.js
-FROM node:18 AS builder
+FROM node:20-bullseye AS builder
 
-# Dossier de travail dans le container
 WORKDIR /app
 
-# Copier package.json et package-lock.json
 COPY package*.json ./
-
-# Installer les dépendances
 RUN npm install
 
-# Copier le reste du projet
 COPY . .
-
-# Build Strapi (si nécessaire)
 RUN npm run build
-# =========================
-# STAGE 2 : PRODUCTION
-# =========================
-FROM node:18-alpine
+
+FROM node:20-bullseye-slim
 
 WORKDIR /app
 
@@ -30,8 +17,6 @@ RUN npm install --omit=dev
 
 COPY --from=builder /app .
 
-# Exposer le port (Strapi = )
-EXPOSE 3000
+EXPOSE 1337
 
-# Commande pour lancer l'app
 CMD ["npm", "run", "develop"]
