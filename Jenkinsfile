@@ -15,6 +15,7 @@ pipeline {
 
         stage('SCM') {
             steps {
+                deleteDir()
                 git branch: 'main',
                     url: 'https://github.com/Nawreskhalifa/SelectIlLa_Backend.git'
             }
