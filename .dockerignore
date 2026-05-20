@@ -1,6 +1,8 @@
 node_modules
-coverage
 .git
 .gitignore
-Dockerfile
-npm-debug.log
+*.md
+.env
+.tmp
+.cache
+build
