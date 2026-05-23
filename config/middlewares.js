@@ -17,7 +17,8 @@ module.exports = [
               'http://localhost:3002',
               'http://a7e93222b68ba4ed7941b1ac21f614a8-1215444167.us-east-1.elb.amazonaws.com:1337',
               'http://a4cb9440074d847c5920de29d145c16c-2097880286.us-east-1.elb.amazonaws.com:1337',
-              'http://ae68f7109c75e4893a4ea1ed1afcb864-198466707.us-east-1.elb.amazonaws.com',  // ← AJOUTER
+              'http://ae68f7109c75e4893a4ea1ed1afcb864-198466707.us-east-1.elb.amazonaws.com', 
+              'http://a609672e697844c1685f6439c0d128f5-1515047266.us-east-1.elb.amazonaws.com:1337',
             ],
           "img-src": ["'self'", "data:", "blob:", "http:"],
           "media-src": ["'self'", "data:", "blob:", "http:"],
@@ -61,7 +62,9 @@ module.exports = [
          'http://a7e93222b68ba4ed7941b1ac21f614a8-1215444167.us-east-1.elb.amazonaws.com:1337',
         'http://ad7b91c4685d943258995a5f24070881-1285256874.us-east-1.elb.amazonaws.com',
         'http://a4cb9440074d847c5920de29d145c16c-2097880286.us-east-1.elb.amazonaws.com:1337',
-      'http://ae68f7109c75e4893a4ea1ed1afcb864-198466707.us-east-1.elb.amazonaws.com',      ]
+      'http://ae68f7109c75e4893a4ea1ed1afcb864-198466707.us-east-1.elb.amazonaws.com',  
+    'http://a609672e697844c1685f6439c0d128f5-1515047266.us-east-1.elb.amazonaws.com:1337',
+'http://aa2b0ca94b3a2410eb70eae46b271775-583841269.us-east-1.elb.amazonaws.com',    ]
     
     },
   },
