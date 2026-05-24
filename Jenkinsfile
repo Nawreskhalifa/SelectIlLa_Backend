@@ -3,350 +3,331 @@ pipeline {
     agent any
 
     environment {
-        SONAR_TOKEN       = credentials('sonar-token1')
-        SONAR_HOST_URL    = 'http://sonarqube:9000'
-        AWS_REGION        = 'us-east-1'
-        ECR_REPO          = '289835834707.dkr.ecr.us-east-1.amazonaws.com/selectilla-backend'
-        IMAGE_TAG         = "${BUILD_NUMBER}"
-        HELM_CHART_PATH   = '/home/nawres/projetPFE/selectitla-chart'
-        PATH              = "/opt/sonar-scanner/bin:${env.PATH}"
-        EMAIL_DEST        = 'nawreskhalifa17@gmail.com'
-        TRIVY_TXT         = "trivy-backend-${BUILD_NUMBER}.txt"
-        TRIVY_HTML        = "trivy-backend-${BUILD_NUMBER}.html"
-        TRIVY_PDF         = "trivy-backend-${BUILD_NUMBER}.pdf"
+
+        SONAR_TOKEN    = credentials('sonar-token1')
+        SONAR_HOST_URL = 'http://sonarqube:9000'
+
+        AWS_REGION     = 'us-east-1'
+        ECR_REPO       = '289835834707.dkr.ecr.us-east-1.amazonaws.com/selectilla-backend'
+        IMAGE_TAG      = "${BUILD_NUMBER}"
+
+        // Chart dans repo infra
+        HELM_CHART_PATH = "infra/selectitla-chart"
+
+        PATH = "/opt/sonar-scanner/bin:${env.PATH}"
+
+        EMAIL_DEST = 'nawreskhalifa17@gmail.com'
+
+        TRIVY_TXT  = "trivy-backend-${BUILD_NUMBER}.txt"
+        TRIVY_HTML = "trivy-backend-${BUILD_NUMBER}.html"
+        TRIVY_PDF  = "trivy-backend-${BUILD_NUMBER}.pdf"
     }
 
     stages {
 
+        // ============================================================
+        // SCM
+        // ============================================================
+
         stage('SCM') {
+
             steps {
+
                 deleteDir()
+
+                // Backend
                 git branch: 'main',
+                    credentialsId: 'github-token1',
                     url: 'https://github.com/Nawreskhalifa/SelectIlLa_Backend.git'
+
+                // Infra repo
+                dir('infra') {
+
+                    git branch: 'main',
+                        credentialsId: 'github-token1',
+                        url: 'https://github.com/Nawreskhalifa/projetPFE.git'
+                }
+
+                sh '''
+                    echo "=== Workspace ==="
+                    pwd
+
+                    echo "=== Files ==="
+                    ls -la
+
+                    echo "=== Infra ==="
+                    ls -la infra || true
+
+                    echo "=== Helm Chart ==="
+                    ls -la infra/selectitla-chart || true
+                '''
             }
         }
 
+        // ============================================================
+        // NPM
+        // ============================================================
+
         stage('Install npm') {
+
             steps {
                 sh 'npm install'
             }
         }
 
+        // ============================================================
+        // SONARQUBE
+        // ============================================================
+
         stage('SonarQube Analysis') {
+
             steps {
+
                 withSonarQubeEnv('SonarQube') {
+
                     sh """
                         sonar-scanner \
                         -Dsonar.projectKey=SelectIlLa_Backend \
                         -Dsonar.sources=. \
                         -Dsonar.host.url=${SONAR_HOST_URL} \
-                        -Dsonar.login=\${SONAR_TOKEN}
+                        -Dsonar.login=${SONAR_TOKEN}
                     """
                 }
             }
         }
 
+        // ============================================================
+        // QUALITY GATE
+        // ============================================================
+
         stage('Quality Gate') {
+
             steps {
+
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+
                     timeout(time: 10, unit: 'MINUTES') {
+
                         waitForQualityGate abortPipeline: false
                     }
                 }
             }
         }
 
+        // ============================================================
+        // DOCKER BUILD
+        // ============================================================
+
         stage('Build Docker Image') {
+
             steps {
-                sh "docker build -t selectilla-backend:${IMAGE_TAG} ."
+
+                sh """
+                    docker build \
+                    -t selectilla-backend:${IMAGE_TAG} .
+                """
             }
         }
+
+        // ============================================================
+        // TAG IMAGE
+        // ============================================================
 
         stage('Tag Docker Image') {
+
             steps {
-                sh "docker tag selectilla-backend:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}"
+
+                sh """
+                    docker tag \
+                    selectilla-backend:${IMAGE_TAG} \
+                    ${ECR_REPO}:${IMAGE_TAG}
+                """
             }
         }
 
+        // ============================================================
+        // LOGIN ECR
+        // ============================================================
+
         stage('Login to AWS ECR') {
+
             steps {
+
                 withCredentials([
                     string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
+
                     sh '''
-                        AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                        AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                        AWS_DEFAULT_REGION=us-east-1 \
-                        aws ecr get-login-password --region us-east-1 | \
-                        docker login --username AWS \
+                        aws ecr get-login-password \
+                        --region us-east-1 | \
+                        docker login \
+                        --username AWS \
                         --password-stdin 289835834707.dkr.ecr.us-east-1.amazonaws.com
                     '''
                 }
             }
         }
 
+        // ============================================================
+        // PUSH IMAGE
+        // ============================================================
+
         stage('Push Docker Image') {
+
             steps {
+
                 sh "docker push ${ECR_REPO}:${IMAGE_TAG}"
             }
         }
 
-        // ─────────────────────────────────────────────────────────────
-        //  Trivy — scan + rapport TXT + HTML + PDF
-        // ─────────────────────────────────────────────────────────────
+        // ============================================================
+        // TRIVY
+        // ============================================================
         stage('Trivy Image Scan') {
+        
             steps {
-                withCredentials([
-                    string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
-                ]) {
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                        sh """
-                            set -e
-
-                            # Re-login ECR
-                            AWS_ACCESS_KEY_ID=\$AWS_ACCESS_KEY_ID \
-                            AWS_SECRET_ACCESS_KEY=\$AWS_SECRET_ACCESS_KEY \
-                            AWS_DEFAULT_REGION=us-east-1 \
-                            aws ecr get-login-password --region us-east-1 | \
-                            docker login --username AWS \
-                            --password-stdin 289835834707.dkr.ecr.us-east-1.amazonaws.com
-
-                            # Template HTML officiel Trivy
-                            mkdir -p /tmp/trivy-templates
-                            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl \
-                                -o /tmp/trivy-templates/html.tpl
-
-                            # 1. Rapport TEXT
-                            trivy image \
-                                --severity HIGH,CRITICAL \
-                                --exit-code 0 \
-                                --no-progress \
-                                --format table \
-                                --output ${TRIVY_TXT} \
-                                ${ECR_REPO}:${IMAGE_TAG}
-
-                            # 2. Rapport HTML
-                            trivy image \
-                                --severity HIGH,CRITICAL \
-                                --exit-code 1 \
-                                --no-progress \
-                                --format template \
-                                --template "@/tmp/trivy-templates/html.tpl" \
-                                --output ${TRIVY_HTML} \
-                                ${ECR_REPO}:${IMAGE_TAG}
-
-                            # 3. Convertir HTML → PDF avec wkhtmltopdf
-                            wkhtmltopdf \
-                                --page-size A4 \
-                                --orientation Landscape \
-                                --margin-top 10mm \
-                                --margin-bottom 10mm \
-                                --margin-left 10mm \
-                                --margin-right 10mm \
-                                --title "Trivy Security Report - Build ${IMAGE_TAG}" \
-                                ${TRIVY_HTML} ${TRIVY_PDF} || \
-                                echo "PDF generation skipped (wkhtmltopdf not available)"
-                        """
-                    }
+        
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        
+            sh """
+                    mkdir -p /tmp/trivy-templates
+                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl \
+                    -o /tmp/trivy-templates/html.tpl
+                
+                    trivy image \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 0 \
+                        --no-progress \
+                        --format table \
+                        --output ${TRIVY_TXT} \
+                        ${ECR_REPO}:${IMAGE_TAG}
+                
+                    trivy image \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 0 \
+                        --no-progress \
+                        --format template \
+                        --template "@/tmp/trivy-templates/html.tpl" \
+                        --output ${TRIVY_HTML} \
+                        ${ECR_REPO}:${IMAGE_TAG}
+                
+                    wkhtmltopdf ${TRIVY_HTML} ${TRIVY_PDF} || true
+                """
                 }
             }
+        
             post {
+        
                 always {
-                    // Afficher le rapport texte dans la console
-                    sh """
-                        echo '========================================='
-                        echo '      TRIVY SECURITY REPORT - BUILD ${BUILD_NUMBER}    '
-                        echo '========================================='
-                        cat ${TRIVY_TXT} || echo 'Rapport texte non disponible'
-                        echo '========================================='
-                    """
-
-                    // Archiver TXT + HTML + PDF
-                    archiveArtifacts artifacts: "trivy-backend-*.txt, trivy-backend-*.html, trivy-backend-*.pdf",
+        
+                    archiveArtifacts artifacts: "trivy-backend-*.txt,trivy-backend-*.html,trivy-backend-*.pdf",
                                      allowEmptyArchive: true
-
-                    // Publier rapport HTML dans Jenkins UI
+        
                     publishHTML(target: [
                         allowMissing         : true,
                         alwaysLinkToLastBuild: true,
                         keepAll              : true,
                         reportDir            : '.',
                         reportFiles          : "${TRIVY_HTML}",
-                        reportName           : 'Trivy Security Report',
-                        reportTitles         : 'Trivy Image Scan - Backend'
+                        reportName           : 'Trivy Security Report'
                     ])
+        
+                    emailext(
+                        subject: "Trivy Security Report - Build #${BUILD_NUMBER}",
+                        body: """
+        Trivy scan completed for build #${BUILD_NUMBER}.
+        
+        Image: ${ECR_REPO}:${BUILD_NUMBER}
+        
+        Please find the security report attached.
+        
+        Console: ${BUILD_URL}
+        """,
+                        attachmentsPattern: "trivy-backend-${BUILD_NUMBER}.pdf",
+                        to: "${EMAIL_DEST}"
+                    )
                 }
             }
         }
+        // ============================================================
+        // DEPLOY EKS
+        // ============================================================
 
-        // ─────────────────────────────────────────────────────────────
-        //  Deploy — token EKS généré juste avant utilisation
-        // ─────────────────────────────────────────────────────────────
         stage('Deploy to EKS') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
-                ]) {
-                    sh '''
-                        set -e
+    steps {
+        withCredentials([
+            string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+            sh '''
+                set -e
 
-                        # 1. Infos cluster
-                        CLUSTER_ENDPOINT=$(AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                            AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                            AWS_DEFAULT_REGION=us-east-1 \
-                            aws eks describe-cluster \
-                            --name selectilla-cluster \
-                            --query "cluster.endpoint" \
-                            --output text)
+                aws eks update-kubeconfig \
+                    --name selectilla-cluster \
+                    --region us-east-1
 
-                        CLUSTER_CA=$(AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                            AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                            AWS_DEFAULT_REGION=us-east-1 \
-                            aws eks describe-cluster \
-                            --name selectilla-cluster \
-                            --query "cluster.certificateAuthority.data" \
-                            --output text)
+                kubectl get nodes
 
-                        # 2. Token FRAIS généré juste avant usage
-                        EKS_TOKEN=$(AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                            AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                            AWS_DEFAULT_REGION=us-east-1 \
-                            aws eks get-token \
-                            --cluster-name selectilla-cluster \
-                            --query "status.token" \
-                            --output text)
+                echo "=== HELM CHART ==="
+                ls -la infra/selectitla-chart
 
-                        # 3. Kubeconfig avec token inline
-                        cat > /tmp/kubeconfig-selectilla << KUBEEOF
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: ${CLUSTER_ENDPOINT}
-    certificate-authority-data: ${CLUSTER_CA}
-  name: selectilla-cluster
-contexts:
-- context:
-    cluster: selectilla-cluster
-    user: jenkins
-  name: selectilla-context
-current-context: selectilla-context
-users:
-- name: jenkins
-  user:
-    token: ${EKS_TOKEN}
-KUBEEOF
+                helm upgrade --install selectilla infra/selectitla-chart \
+                    --namespace default \
+                    --create-namespace \
+                    --set backend.image.repository=$ECR_REPO \
+                    --set backend.image.tag=$BUILD_NUMBER
 
-                        chmod 600 /tmp/kubeconfig-selectilla
-
-                        # 4. Vérifier connexion
-                        KUBECONFIG=/tmp/kubeconfig-selectilla kubectl get nodes
-
-                        # 5. Déployer avec Helm
-                        KUBECONFIG=/tmp/kubeconfig-selectilla \
-                        helm upgrade --install selectitla /var/jenkins_home/workspace/App_ SelectIlLa_Backend/selectitla-chart \
-                        --namespace default \
-                        --create-namespace \
-                        --set backend.image.repository=$ECR_REPO \
-                        --set backend.image.tag=$BUILD_NUMBER
-
-                        # 6. Vérifier le rollout
-                        KUBECONFIG=/tmp/kubeconfig-selectilla \
-                        kubectl rollout status deployment/backend-deployment
-                    '''
-                }
-            }
+                kubectl rollout status deployment/backend-deployment
+            '''
         }
     }
+}
+    }
+
+    // ============================================================
+    // POST
+    // ============================================================
 
     post {
 
-        success {
-            emailext(
-                subject: " Backend Pipeline #${env.BUILD_NUMBER} — SUCCES",
-                body: """
-============================================
-BACKEND CI/CD — SUCCES
+        always {
 
-Projet   : ${env.JOB_NAME}
-Build    : #${env.BUILD_NUMBER}
-Image    : ${ECR_REPO}:${env.BUILD_NUMBER}
-Namespace: default
-
-Console   : ${env.BUILD_URL}
-SonarQube : ${SONAR_HOST_URL}/dashboard?id=SelectIlLa_Backend
-Trivy HTML: ${env.BUILD_URL}Trivy_20Security_20Report/
-Trivy PDF : ${env.BUILD_URL}artifact/${TRIVY_PDF}
-============================================
-""",
-                to: "${env.EMAIL_DEST}",
-                mimeType: 'text/plain'
-            )
+            deleteDir()
         }
 
-        unstable {
+        success {
+
             emailext(
-                subject: " Backend Pipeline #${env.BUILD_NUMBER} — INSTABLE",
+                subject: "SUCCESS Backend Pipeline #${BUILD_NUMBER}",
                 body: """
-============================================
-BACKEND CI/CD — INSTABLE
+Pipeline SUCCESS
 
-Projet   : ${env.JOB_NAME}
-Build    : #${env.BUILD_NUMBER}
-Image    : ${ECR_REPO}:${env.BUILD_NUMBER}
-Namespace: default
+Build:
+${BUILD_NUMBER}
 
-Le pipeline a réussi MAIS :
-  - Quality Gate SonarQube a échoué OU
-  - Trivy a détecté des vulnérabilités HIGH/CRITICAL
+Image:
+${ECR_REPO}:${BUILD_NUMBER}
 
-Console   : ${env.BUILD_URL}
-SonarQube : ${SONAR_HOST_URL}/dashboard?id=SelectIlLa_Backend
-Trivy HTML: ${env.BUILD_URL}Trivy_20Security_20Report/
-Trivy PDF : ${env.BUILD_URL}artifact/${TRIVY_PDF}
-============================================
+Console:
+${BUILD_URL}
 """,
-                to: "${env.EMAIL_DEST}",
-                mimeType: 'text/plain'
+                to: "${EMAIL_DEST}"
             )
         }
 
         failure {
+
             emailext(
-                subject: "❌ Backend Pipeline #${env.BUILD_NUMBER} — ECHEC",
+                subject: "FAILURE Backend Pipeline #${BUILD_NUMBER}",
                 body: """
-============================================
-BACKEND CI/CD — ECHEC
+Pipeline FAILED
 
-Projet  : ${env.JOB_NAME}
-Build   : #${env.BUILD_NUMBER}
-Branche : main
-Statut  : ECHEC
-
-Console   : ${env.BUILD_URL}console
-SonarQube : ${SONAR_HOST_URL}/dashboard?id=SelectIlLa_Backend
-
-Verifier :
-  - Connexion SonarQube
-  - Quality Gate
-  - Docker Build
-  - Trivy Scan
-  - Connexion EKS (token expiré ?)
-  - Helm Deployment
-  - Kubernetes Pods
-============================================
+Console:
+${BUILD_URL}console
 """,
-                to: "${env.EMAIL_DEST}",
-                mimeType: 'text/plain'
+                to: "${EMAIL_DEST}"
             )
-        }
-
-        always {
-            sh 'rm -f /tmp/kubeconfig-selectilla'
-            deleteDir()
         }
     }
 }
