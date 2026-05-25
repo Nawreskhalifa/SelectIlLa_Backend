@@ -59,3 +59,4 @@ Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/
 # SelectIlLa_Backend
 test trigger
 trigger lun. 25 mai 2026 01:28:20 CET
+test domaine fixe
