@@ -5,15 +5,14 @@ pipeline {
     environment {
 
         SONAR_TOKEN    = credentials('sonar-token1')
-        SONAR_HOST_URL = 'http://sonarqube:9000'
-
+        SONAR_HOST_URL = 'https://sonarcloud.io'
+        SONAR_ORG      = 'Nawreskhalifa'
         AWS_REGION     = 'us-east-1'
         ECR_REPO       = '289835834707.dkr.ecr.us-east-1.amazonaws.com/selectilla-backend'
         IMAGE_TAG      = "${BUILD_NUMBER}"
 
         // Chart dans repo infra
-        HELM_CHART_PATH = "infra/selectitla-chart"
-
+        HELM_CHART_PATH = "infra/selectilla-chart"
         PATH = "/opt/sonar-scanner/bin:${env.PATH}"
 
         EMAIL_DEST = 'nawreskhalifa17@gmail.com'
@@ -71,14 +70,12 @@ pipeline {
 
  
         stage('SonarQube Analysis') {
-
             steps {
-
                 withSonarQubeEnv('SonarQube') {
-
                     sh """
                         sonar-scanner \
                         -Dsonar.projectKey=SelectIlLa_Backend \
+                        -Dsonar.organization=${SONAR_ORG} \
                         -Dsonar.sources=. \
                         -Dsonar.host.url=${SONAR_HOST_URL} \
                         -Dsonar.login=${SONAR_TOKEN}
