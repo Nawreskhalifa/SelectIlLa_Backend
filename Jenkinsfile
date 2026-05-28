@@ -286,33 +286,33 @@ pipeline {
             emailext(
                 subject: "SUCCESS Backend Pipeline #${BUILD_NUMBER}",
                 body: """
-Pipeline SUCCESS
+                    Pipeline SUCCESS
 
-Build:
-${BUILD_NUMBER}
+                    Build:
+                    ${BUILD_NUMBER}
 
-Image:
-${ECR_REPO}:${BUILD_NUMBER}
+                    Image:
+                    ${ECR_REPO}:${BUILD_NUMBER}
 
-Console:
-${BUILD_URL}
-""",
-                to: "${EMAIL_DEST}"
-            )
-        }
+                    Console:
+                    ${BUILD_URL}
+                    """,
+                                    to: "${EMAIL_DEST}"
+                                )
+                            }
 
-        failure {
+                            failure {
 
-            emailext(
-                subject: "FAILURE Backend Pipeline #${BUILD_NUMBER}",
-                body: """
-Pipeline FAILED
+                                emailext(
+                                    subject: "FAILURE Backend Pipeline #${BUILD_NUMBER}",
+                                    body: """
+                    Pipeline FAILED
 
-Console:
-${BUILD_URL}console
-""",
-                to: "${EMAIL_DEST}"
-            )
-        }
-    }
-}
+                    Console:
+                    ${BUILD_URL}console
+                    """,
+                                    to: "${EMAIL_DEST}"
+                                )
+                            }
+                    }
+                }
