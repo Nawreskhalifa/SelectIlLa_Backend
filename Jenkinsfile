@@ -6,7 +6,7 @@ pipeline {
 
         SONAR_TOKEN    = credentials('sonar-token1')
         SONAR_HOST_URL = 'https://sonarcloud.io'
-        SONAR_ORG      = 'Nawreskhalifa'
+        SONAR_ORG      = 'nawreskhalifa'
         AWS_REGION     = 'us-east-1'
         ECR_REPO       = '289835834707.dkr.ecr.us-east-1.amazonaws.com/selectilla-backend'
         IMAGE_TAG      = "${BUILD_NUMBER}"
